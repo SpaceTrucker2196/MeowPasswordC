@@ -44,6 +44,7 @@ typedef struct {
     bool psssst;
     bool show_help;
     bool check_update;
+    char *analyze_string;
 } PasswordConfig;
 
 /* Complexity analysis result */

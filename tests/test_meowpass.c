@@ -260,6 +260,68 @@ static void test_update_version_compare(void) {
 }
 
 /**
+ * Test --analyze config parsing
+ */
+static void test_analyze_config(void) {
+    printf("\nTesting Meow Analyze Config Parsing...\n");
+
+    /* Test --analyze flag */
+    char *argv1[] = {"meowpass", "--analyze", "TestMeow123!"};
+    PasswordConfig config1;
+    config_init(&config1, 3, argv1);
+    assert_true(config1.analyze_string != NULL, "Analyze string should be set with --analyze");
+    assert_true(strcmp(config1.analyze_string, "TestMeow123!") == 0,
+                "Analyze string should match meow input");
+
+    /* Test -a short flag */
+    char *argv2[] = {"meowpass", "-a", "CatPaws42"};
+    PasswordConfig config2;
+    config_init(&config2, 3, argv2);
+    assert_true(config2.analyze_string != NULL, "Analyze string should be set with -a");
+    assert_true(strcmp(config2.analyze_string, "CatPaws42") == 0,
+                "Analyze string should match meow input with -a");
+
+    /* Test missing argument */
+    char *argv3[] = {"meowpass", "--analyze"};
+    PasswordConfig config3;
+    config_init(&config3, 2, argv3);
+    assert_true(config3.analyze_string == NULL,
+                "Analyze string should be NULL when no meow argument given");
+
+    printf("Meow analyze config tests passed!\n");
+}
+
+/**
+ * Test analyze complexity on user input strings
+ */
+static void test_analyze_input_string(void) {
+    printf("\nTesting Meow Analyze Input String...\n");
+
+    /* Test a strong password */
+    ComplexityResult strong_result;
+    analyze_complexity("C@tP4ws!Str0ng#Meow", &strong_result);
+    assert_true(strong_result.score > 0.0, "Strong password should have a meow positive score");
+    assert_true(strong_result.entropy > 2.0, "Strong password should have high ball of yarn entropy");
+    assert_true(strong_result.character_diversity > 0.5,
+                "Strong password should have high catnip diversity");
+
+    /* Test a weak password */
+    ComplexityResult weak_result;
+    analyze_complexity("aaaa", &weak_result);
+    assert_true(weak_result.entropy < 0.1, "Weak password should have low meow entropy");
+    assert_true(weak_result.character_diversity < 0.5,
+                "Weak password should have low catnip diversity");
+
+    /* Test empty string */
+    ComplexityResult empty_result;
+    memset(&empty_result, 0xFF, sizeof(empty_result));
+    analyze_complexity("", &empty_result);
+    assert_true(empty_result.length == 0, "Empty string should have zero meow tail size");
+
+    printf("Meow analyze input string tests passed!\n");
+}
+
+/**
  * Run all tests (exported function)
  */
 int run_tests(void) {
@@ -276,6 +338,8 @@ int run_tests(void) {
     test_config_parsing();
     test_relevancy_score_explanation();
     test_update_version_compare();
+    test_analyze_config();
+    test_analyze_input_string();
 
     printf("\nMeow Basic Tests Complete!\n");
     printf("=====================\n");

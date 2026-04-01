@@ -89,6 +89,30 @@ int main(int argc, char *argv[]) {
         return check_for_update();
     }
 
+    /* Handle analyze mode */
+    if (config.analyze_string) {
+        display_header();
+        printf("Meow Analyzing your string for cat-cracking resistance...\n\n");
+
+        ComplexityResult result;
+        analyze_complexity(config.analyze_string, &result);
+
+        display_analysis(&result, config.analyze_string);
+
+        printf("\n");
+        if (result.score < 2.0) {
+            printf("🐱 Purrfect! This string is fur-midably complex. Even the cleverest cats can't crack it!\n");
+        } else if (result.score < 4.0) {
+            printf("😺 Not bad, hooman! This string has decent whisker-resistance.\n");
+        } else if (result.score < 6.0) {
+            printf("😿 Meow... this string is a bit too easy for a clever cat to guess.\n");
+        } else {
+            printf("🙀 Hiss! A kitten could paw this one open! Try a meowpass-generated password instead!\n");
+        }
+
+        return 0;
+    }
+
     /* Load cat names */
     size_t names_count = get_cat_names_count();
     if (names_count == 0) {

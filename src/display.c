@@ -47,12 +47,14 @@ void display_help(void) {
     printf("  --copy           Copy password to clipboard (Linux xclip required)\n");
     printf("  --psssst, -p     Copy password to clipboard without displaying it\n");
     printf("                   (more secure - password won't be shown in clear text)\n");
+    printf("  --analyze, -a S  Analyze a string's meow complexity (treats it like a password)\n");
     printf("  --update         Check GitHub for updates and install if available\n");
     printf("  --help, -h       Show this help message\n");
     printf("\n");
     printf("Examples:\n");
     printf("  meowpass\n");
     printf("  meowpass --numbers 4 --symbols 3 --max-length 30\n");
+    printf("  meowpass --analyze \"MyP@ssw0rd!\"\n");
     printf("  meowpass --test\n");
 }
 
