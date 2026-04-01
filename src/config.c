@@ -26,6 +26,7 @@ void config_init(PasswordConfig *config, int argc, char *argv[]) {
     config->psssst = false;
     config->show_help = false;
     config->check_update = false;
+    config->analyze_string = NULL;
 
     /* Parse command line arguments */
     for (int i = 1; i < argc; i++) {
@@ -58,6 +59,11 @@ void config_init(PasswordConfig *config, int argc, char *argv[]) {
             config->show_help = true;
         } else if (strcmp(argv[i], "--update") == 0) {
             config->check_update = true;
+        } else if (strcmp(argv[i], "--analyze") == 0 || strcmp(argv[i], "-a") == 0) {
+            if (i + 1 < argc) {
+                config->analyze_string = argv[i + 1];
+                i++;
+            }
         }
     }
 }
