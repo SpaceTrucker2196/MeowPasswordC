@@ -11,7 +11,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <time.h>
 #include "../src/meowpass.h"
 
 static int tests_passed = 0;
@@ -327,9 +326,6 @@ static void test_analyze_input_string(void) {
 int run_tests(void) {
     printf("Running Basic MeowPassword Tests\n");
     printf("=================================\n");
-
-    /* Seed random for reproducible-ish tests */
-    srand((unsigned int)time(NULL));
 
     test_load_cat_names();
     test_complete_password_generation();

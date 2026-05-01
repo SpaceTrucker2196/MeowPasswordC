@@ -26,6 +26,7 @@ set(SOURCES
     src/catnames.c
     src/display.c
     src/update.c
+    src/random.c
     tests/test_meowpass.c
 )
 
