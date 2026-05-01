@@ -11,6 +11,7 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 /* Version info */
 #define MEOWPASS_VERSION "1.0.0"
@@ -80,6 +81,25 @@ void config_init(PasswordConfig *config, int argc, char *argv[]);
  * @return Clamped value
  */
 int clamp_int(int value, int min, int max);
+
+/* ============ Random Functions (random.c) ============ */
+
+/**
+ * Fill buffer with cryptographically secure random bytes.
+ * Aborts if no secure source is available.
+ */
+void meow_random_bytes(void *buf, size_t len);
+
+/**
+ * Return a uniformly distributed 32-bit unsigned integer.
+ */
+uint32_t meow_random_u32(void);
+
+/**
+ * Return a uniformly distributed integer in [0, bound).
+ * Returns 0 if bound == 0. Free of modulo bias.
+ */
+uint32_t meow_random_uniform(uint32_t bound);
 
 /* ============ Cat Names Functions (catnames.c) ============ */
 

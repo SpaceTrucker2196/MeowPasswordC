@@ -10,42 +10,56 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include "meowpass.h"
 
 /**
- * Copy password to clipboard using xclip on Linux
+ * Pipe `password` into a clipboard tool. Returns true on success.
+ */
+static bool pipe_to(const char *cmd, const char *password) {
+    FILE *clip = popen(cmd, "w");
+    if (!clip) return false;
+    fprintf(clip, "%s", password);
+    return pclose(clip) == 0;
+}
+
+#if defined(__linux__)
+/**
+ * Returns true if the named program is found on PATH.
+ */
+static bool have_program(const char *name) {
+    char buf[512];
+    snprintf(buf, sizeof(buf), "command -v %s >/dev/null 2>&1", name);
+    return system(buf) == 0;
+}
+#endif
+
+/**
+ * Copy password to clipboard using xclip on Linux or pbcopy on macOS.
  */
 static void copy_to_clipboard(const char *password, bool silent) {
-#ifdef __linux__
-    /* Check if xclip is available */
-    FILE *test = popen("which xclip 2>/dev/null", "r");
-    if (test) {
-        char buf[256];
-        if (fgets(buf, sizeof(buf), test) != NULL) {
-            pclose(test);
+    const char *cmd = NULL;
+    const char *missing_msg = NULL;
 
-            /* Use xclip to copy to clipboard */
-            FILE *clip = popen("xclip -selection clipboard", "w");
-            if (clip) {
-                fprintf(clip, "%s", password);
-                pclose(clip);
-                if (silent) {
-                    printf("----> copied!\n");
-                } else {
-                    printf("\nPassword copied to clipboard!\n");
-                }
-                return;
-            }
-        } else {
-            pclose(test);
-        }
+#if defined(__APPLE__)
+    cmd = "pbcopy";
+    missing_msg = "\nClipboard functionality requires pbcopy (default on macOS)\n";
+#elif defined(__linux__)
+    if (have_program("xclip")) {
+        cmd = "xclip -selection clipboard";
+    } else if (have_program("wl-copy")) {
+        cmd = "wl-copy";
     }
-    printf("\nClipboard functionality requires xclip (apt install xclip)\n");
+    missing_msg = "\nClipboard functionality requires xclip or wl-copy "
+                  "(apt install xclip)\n";
 #else
-    (void)silent;
-    printf("\nClipboard functionality only available on Linux with xclip\n");
+    missing_msg = "\nClipboard functionality not supported on this platform\n";
 #endif
+
+    if (cmd && pipe_to(cmd, password)) {
+        printf("%s", silent ? "----> copied!\n" : "\nPassword copied to clipboard!\n");
+        return;
+    }
+    printf("%s", missing_msg);
 }
 
 /**
@@ -66,9 +80,6 @@ static int find_best_candidate(PasswordCandidate *candidates, int count) {
 }
 
 int main(int argc, char *argv[]) {
-    /* Seed random number generator */
-    srand((unsigned int)time(NULL));
-
     /* Parse configuration */
     PasswordConfig config;
     config_init(&config, argc, argv);

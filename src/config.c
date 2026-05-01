@@ -18,7 +18,7 @@ int clamp_int(int value, int min, int max) {
 
 void config_init(PasswordConfig *config, int argc, char *argv[]) {
     /* Set defaults */
-    config->num_numbers = (rand() % 4) + 1;  /* Random 1-4 as per Swift spec */
+    config->num_numbers = (int)meow_random_uniform(4) + 1;  /* Random 1-4 as per Swift spec */
     config->num_symbols = DEFAULT_NUM_SYMBOLS;
     config->max_length = DEFAULT_MAX_LENGTH;
     config->show_tests = false;
