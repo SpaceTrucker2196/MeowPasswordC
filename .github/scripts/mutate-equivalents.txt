@@ -26,3 +26,11 @@
 #          char_counts[] slots)
 #
 # Start empty. Earn each entry by triaging a real survivor.
+
+# ------------------------------------------------------------
+# src/complexity.c — Round 1 triage
+# ------------------------------------------------------------
+src/complexity.c:34:rel:<:<=          # LZT: char_counts[256] is read past array end; the >0 guard at L35 makes any value at that index unobservable (UB-tolerant on typical stacks)
+src/complexity.c:52:const:1:0         # OPT: run_length init is overwritten on the first loop iteration's else branch (i=0 always differs from '\0')
+src/complexity.c:167:const:10:11      # WGT: score cap unreachable — max composite is ~3.1 given the current 0.3/0.25/0.2/0.15/0.1 weights and component ranges
+src/complexity.c:167:const:10:9       # WGT: same — even a 9.0 cap exceeds the max achievable composite

@@ -42,6 +42,28 @@ static void assert_equal_int(int actual, int expected, const char *message) {
     }
 }
 
+static double meow_abs_d(double x) { return x < 0 ? -x : x; }
+
+static void assert_double_eq(double actual, double expected, const char *message) {
+    if (meow_abs_d(actual - expected) < 1e-9) {
+        printf("PASS: %s\n", message);
+        tests_passed++;
+    } else {
+        printf("FAIL: %s - Expected: %.9f, Got: %.9f\n", message, expected, actual);
+        tests_failed++;
+    }
+}
+
+static void assert_double_eq_eps(double actual, double expected, double eps, const char *message) {
+    if (meow_abs_d(actual - expected) < eps) {
+        printf("PASS: %s\n", message);
+        tests_passed++;
+    } else {
+        printf("FAIL: %s - Expected: %.6f +- %.6f, Got: %.6f\n", message, expected, eps, actual);
+        tests_failed++;
+    }
+}
+
 /**
  * Test cat name loading
  */
@@ -321,6 +343,82 @@ static void test_analyze_input_string(void) {
 }
 
 /**
+ * Round-1 mutation gap closers for src/complexity.c.
+ *
+ * Each block pins behavior that was unobservable to the old assertion
+ * set. Hand-derived expected values; see docs/MUTATION-TESTING.md for
+ * the equivalence-class notes on what is intentionally NOT pinned.
+ */
+static void test_complexity_boundaries(void) {
+    printf("\nTesting Meow Complexity Boundary Pinning...\n");
+
+    /* Gap 1 — null & empty guards on every public function. */
+    assert_true(calculate_shannon_entropy(NULL)     == 0.0, "shannon NULL is 0");
+    assert_true(calculate_shannon_entropy("")       == 0.0, "shannon empty is 0");
+    assert_true(calculate_compression_ratio(NULL)   == 0.0, "compress NULL is 0");
+    assert_true(calculate_compression_ratio("")     == 0.0, "compress empty is 0");
+    assert_true(calculate_pattern_complexity(NULL)  == 0.0, "pattern NULL is 0");
+    assert_true(calculate_pattern_complexity("")    == 0.0, "pattern empty is 0");
+    assert_true(calculate_character_diversity(NULL) == 0.0, "diversity NULL is 0");
+    assert_true(calculate_character_diversity("")   == 0.0, "diversity empty is 0");
+
+    {
+        ComplexityResult r;
+        analyze_complexity(NULL, &r);   /* must not crash */
+        analyze_complexity("x", NULL);  /* must not crash */
+        assert_true(1, "analyze_complexity null-safe");
+    }
+
+    /* Gap 2a — shannon entropy: exact values on small inputs. */
+    assert_double_eq(calculate_shannon_entropy("a"),    0.0, "entropy a is 0");
+    assert_double_eq(calculate_shannon_entropy("aa"),   0.0, "entropy aa is 0");
+    assert_double_eq(calculate_shannon_entropy("ab"),   1.0, "entropy ab is 1");
+    assert_double_eq(calculate_shannon_entropy("abcd"), 2.0, "entropy abcd is log2 4");
+
+    /* Gap 2b — compression ratio: pin the RLE math (including its
+     * off-by-one against the implicit '\0' previous). */
+    assert_double_eq(calculate_compression_ratio("a"),    -1.0,  "compress a is -1");
+    assert_double_eq(calculate_compression_ratio("ab"),   -0.5,  "compress ab is -0.5");
+    assert_double_eq(calculate_compression_ratio("aaaa"),  0.25, "compress aaaa is 0.25");
+    assert_double_eq(calculate_compression_ratio("aabb"), -0.25, "compress aabb is -0.25");
+    assert_double_eq(calculate_compression_ratio("aaab"),  0.0,  "compress aaab is 0");
+
+    /* Gap 3 — pattern complexity: pin substring counts. */
+    assert_double_eq(calculate_pattern_complexity("a"),      0.0, "pattern len<2 is 0");
+    assert_double_eq(calculate_pattern_complexity("ab"),     1.0, "pattern ab is 1");
+    assert_double_eq(calculate_pattern_complexity("aa"),     1.0, "pattern aa is 1");
+    assert_double_eq(calculate_pattern_complexity("abcd"),   1.0, "pattern abcd is 1");
+    assert_double_eq(calculate_pattern_complexity("aaaa"),   0.5, "pattern aaaa is 0.5");
+    /* 6-a string catches mutations that bump max_substr_len up (e.g. 4 -> 5)
+     * since slen=5 only fires when len >= 5. */
+    assert_double_eq_eps(calculate_pattern_complexity("aaaaaa"), 0.25, 1e-9,
+                         "pattern aaaaaa is 0.25");
+
+    /* Gap 4 — analyze_complexity composite at multiple lengths.
+     * length=12 catches divisor mutations (25 -> 24/26) because all-a
+     * strings make every other component constant, so only length_norm
+     * changes. length=50 catches the cap-literal mutation (1 -> 0/2)
+     * since fmin(50/25, 1.0) is at the cap. */
+    {
+        ComplexityResult r;
+        analyze_complexity("aaaaaaaaaaaa", &r);                       /* len 12 */
+        assert_equal_int(r.length, 12, "analyze len 12");
+        assert_double_eq_eps(r.score, 0.293, 0.001, "analyze 12-a score");
+
+        analyze_complexity("aaaaaaaaaaaaaaaaaaaaaaaaa", &r);          /* len 25 */
+        assert_equal_int(r.length, 25, "analyze len 25");
+        assert_double_eq_eps(r.score, 0.366195, 0.001, "analyze 25-a score");
+
+        analyze_complexity(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", &r); /* len 50 */
+        assert_equal_int(r.length, 50, "analyze len 50");
+        assert_double_eq_eps(r.score, 0.376667, 0.001, "analyze 50-a score");
+    }
+
+    printf("Meow complexity boundary tests done!\n");
+}
+
+/**
  * Run all tests (exported function)
  */
 int run_tests(void) {
@@ -331,6 +429,7 @@ int run_tests(void) {
     test_complete_password_generation();
     test_shannon_entropy();
     test_character_diversity();
+    test_complexity_boundaries();
     test_config_parsing();
     test_relevancy_score_explanation();
     test_update_version_compare();
