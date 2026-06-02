@@ -54,3 +54,44 @@ src/complexity.c:110:const:1:2        # ALG: `malloc(slen + 1)` → `malloc(slen
 src/complexity.c:110:arith:+:-        # SAN: `malloc(slen + 1)` → `malloc(slen - 1)`; heap overflow on the strncpy+null-terminator that follows. Killed by ASAN.
 src/complexity.c:110:const:1:0        # SAN: `malloc(slen + 1)` → `malloc(slen)`; one-byte overflow on the null terminator. Killed by ASAN.
 src/complexity.c:122:rel:<:<=         # SAN: free-loop `i < substr_count` → `i <= substr_count`; frees one uninitialised slot past the populated range. Killed by ASAN.
+
+# ------------------------------------------------------------
+# src/password.c — Round 2 triage
+# ------------------------------------------------------------
+# select_and_join_names guards — count=0 / names_count=0 short-circuits
+# fall through to no-op loops; observable output is unchanged.
+src/password.c:67:rel:<=:<            # OPT: `count <= 0` → `count < 0`; for count=0 the function falls through but actual_count=0 makes both loops no-op.
+src/password.c:67:bool:||:&&          # OPT: same as above via AND-of-guards path.
+src/password.c:72:rel:>:>=            # OPT: tiebreak `count > names_count` → `>=`; at equality both branches yield the same actual_count value.
+src/password.c:76:rel:>:>=            # OPT: tiebreak `actual_count+5 > names_count` → `>=`; with names_count=16913 and actual_count<=6 never equal in practice.
+src/password.c:79:rel:>:>=            # OPT: tiebreak `total_picks > sizeof(indices)`; at equality the cap is a no-op.
+src/password.c:81:rel:>:>=            # OPT: tiebreak `actual_count > total_picks`; at equality the assignment is a no-op.
+src/password.c:98:rel:>:>=            # OPT: tiebreak `strlen > max_length`; at equality the truncation writes the same '\0' position.
+# randomly_capitalize guards
+src/password.c:105:rel:<=:<           # OPT: `count <= 0` → `count < 0`; for count=0 to_cap=0 makes the loop no-op (same observable as the early return).
+src/password.c:105:bool:||:&&         # OPT: same — for len=0 letter_count=0 path returns early; AND-of-guards still hits the early-return in the no-letters case.
+src/password.c:112:rel:<:<=           # LZT: `i < len` → `i <= len`; reads '\0' which fails isalpha so letter_indices is unchanged.
+src/password.c:125:rel:>:>=           # OPT: tiebreak `count > letter_count`; at equality both branches yield same to_cap.
+# replace_with_symbols guards (mirror of randomly_capitalize)
+src/password.c:153:rel:<=:<           # OPT: count=0 path falls through to no-op.
+src/password.c:153:bool:||:&&         # OPT: same.
+src/password.c:162:rel:<:<=           # LZT: same '\0' tail read as L112.
+src/password.c:175:rel:>:>=           # OPT: tiebreak.
+# Allocator / sizing literals — affect memory cadence not output
+src/password.c:78:const:16:17         # ALG: `size_t indices[16]` larger array; harmless tail.
+src/password.c:78:const:16:15         # ALG: smaller array; total_picks cap at L79 ensures no overrun in practice (max needed is 11).
+# Boolean perturbation
+src/password.c:41:const:1:2           # FAB: `dup = 1` used purely as bool; any non-zero is observably identical.
+# Sanitizer-class memory bugs — real, but silent without ASAN
+src/password.c:37:rel:<:<=            # SAN: pick_random_indices writes past out[k-1] by one slot; killed by ASAN.
+src/password.c:40:rel:<:<=            # SAN: reads uninitialised out[chosen] in dup-detect; killed by ASAN/MSAN.
+src/password.c:51:rel:<:<=            # SAN: append_name writes one byte past output[max_length-1].
+src/password.c:51:arith:-:+           # SAN: `max_length - 1` → `+ 1` writes two bytes past.
+src/password.c:51:const:1:0           # SAN: `max_length - 1` → `max_length` writes one byte past.
+src/password.c:89:rel:<:<=            # SAN: loop bound `out_len < max_length-1` overrun.
+src/password.c:89:arith:-:+           # SAN: same line, second target.
+src/password.c:89:bool:&&:||          # SAN: OR-of-guards lets loop continue past capacity check.
+src/password.c:94:rel:<:<=            # SAN: extras loop overrun.
+src/password.c:94:bool:&&:||          # SAN: same OR-of-guards.
+src/password.c:145:arith:-:+          # SAN: memmove byte-count `len - pos + 1` → `+ pos + 1`; overrun.
+src/password.c:145:const:1:2          # SAN: `len - pos + 1` → `+ 2`; one extra byte.

@@ -583,6 +583,27 @@ static void test_password_transforms(void) {
                     "generate: respects max_length");
     }
 
+    /* Generate with num_symbols=0 and num_numbers=0 so neither the
+     * symbol-replace step nor the truncation can drop letters: upper
+     * count then equals exactly the hardcoded capitalize literal (3),
+     * killing L193 mutations on that literal.
+     *
+     * max_length=MAX_LENGTH(50) gives select_and_join_names enough
+     * headroom that base ≤ 49 < 50, so the truncate-at-50 step never
+     * fires either. */
+    for (int t = 0; t < 4; t++) {
+        char p[MAX_PASSWORD_LENGTH] = {0};
+        PasswordConfig c;
+        c.num_numbers = 0; c.num_symbols = 0; c.max_length = MAX_LENGTH;
+        c.show_tests = false; c.copy_to_clipboard = false;
+        c.psssst = false; c.show_help = false;
+        c.check_update = false; c.analyze_string = NULL;
+        generate_password(&c, p, sizeof(p));
+        int upper = 0;
+        for (char *q = p; *q; q++) if (isupper((unsigned char)*q)) upper++;
+        assert_equal_int(upper, 3, "generate num_symbols=0 num_numbers=0 → exactly 3 upper (pins L193)");
+    }
+
     printf("Meow password transform tests done!\n");
 }
 
