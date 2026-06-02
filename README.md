@@ -1,39 +1,47 @@
-# MeowPassword C
+# meowpass
 
 [![CI](https://github.com/SpaceTrucker2196/MeowPasswordC/actions/workflows/ci.yml/badge.svg)](https://github.com/SpaceTrucker2196/MeowPasswordC/actions/workflows/ci.yml)
 [![C/C++ CI](https://github.com/SpaceTrucker2196/MeowPasswordC/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/SpaceTrucker2196/MeowPasswordC/actions/workflows/c-cpp.yml)
-[![CMake on a single platform](https://github.com/SpaceTrucker2196/MeowPasswordC/actions/workflows/cmake-single-platform.yml/badge.svg)](https://github.com/SpaceTrucker2196/MeowPasswordC/actions/workflows/cmake-single-platform.yml)
+[![CMake](https://github.com/SpaceTrucker2196/MeowPasswordC/actions/workflows/cmake-single-platform.yml/badge.svg)](https://github.com/SpaceTrucker2196/MeowPasswordC/actions/workflows/cmake-single-platform.yml)
 
-A secure, memorable password generator that uses cat names to create strong passwords. Ported from Swift to pure C11 for Linux/Debian systems.
+> Cats are more complex than dogs.
+
+A phrase-password generator that draws from 16,913 embedded cat names, sprinkles
+in digits and symbols, scores five candidates with Shannon entropy and a stack
+of complexity heuristics, and hands you the best one. Pure C11. Single binary.
+Linux + macOS. White-hat.
+
+Marketing site: **https://spacetrucker2196.github.io/MeowPasswordC/**
 
 ## Features
 
-- Generates passwords using 16,913 embedded cat names
-- Shannon entropy analysis for password strength
-- Kolmogorov complexity estimation
-- Pattern complexity and character diversity scoring
-- Configurable password length and complexity
-- Clipboard support via xclip
-- No external dependencies (pure C11)
+- 16,913 cat names embedded directly in the binary — no data files, no network
+- OS-grade randomness (`getrandom()` / `/dev/urandom`) with rejection sampling
+- Best-of-five candidate selection scored across four metrics
+- Catified analysis labels in the CLI (Tail Size, Ball of Yarn Entropy,
+  Mashing Resistance, Shiny Foil Ball Uniqueness, Organic NonGMO Catnip)
+- `--analyze` mode to score any existing string
+- `--psssst` silent mode: copy the winner without ever displaying it
+- `--update` self-updater that checks GitHub Releases
+- Clipboard via `pbcopy` (macOS), `xclip`, or `wl-copy` (Linux)
+- Pure C11. Zero runtime dependencies.
 
-## Building
+## Build
 
-### Using Make
-
+### Make
 ```bash
 make
+./meowpass
 ```
 
-### Using CMake
-
+### CMake
 ```bash
-mkdir build && cd build
-cmake ..
-make
+cmake -B build
+cmake --build build
+./build/meowpass
 ```
 
-## Installation
-
+### Install system-wide
 ```bash
 sudo make install
 ```
@@ -41,55 +49,81 @@ sudo make install
 ## Usage
 
 ```bash
-# Generate a password with default settings
-./meowpass
+# default — generate, score, show, hint to copy
+meowpass
 
-# Generate with specific length
-./meowpass -l 20
+# tune the recipe
+meowpass --numbers 4 --symbols 3 --max-length 30
 
-# Generate with specific complexity (1-10)
-./meowpass -c 8
+# silent mode — copy winner to clipboard, print nothing
+meowpass --psssst
 
-# Verbose output with analysis
-./meowpass -v
+# audit a string you already have
+meowpass --analyze "MyP@ssw0rd!"
 
-# Copy to clipboard
-./meowpass --copy
+# run the test suite
+meowpass --test
 
-# Run tests
-./meowpass --test
-
-# Show help
-./meowpass --help
+# self-update
+meowpass --update
 ```
 
-## How It Works
+### Flags
 
-1. Selects random cat names from the embedded dictionary
-2. Joins names in lowercase
-3. Randomly capitalizes some characters
-4. Inserts random digits
-5. Replaces some characters with symbols
-6. Analyzes resulting password for entropy and complexity
+| Flag | What it does | Range / default |
+|---|---|---|
+| `--numbers N` | Random digits inserted into the phrase | 1–10 · default 1–4 |
+| `--symbols N` | Letter→symbol substitutions | 1–10 · default 2 |
+| `--max-length N` | Cap on final password length | 15–50 · default 25 |
+| `--copy` | Copy winner to clipboard after display | pbcopy / xclip / wl-copy |
+| `--psssst`, `-p` | Silent mode — copy only, never print | — |
+| `--analyze`, `-a S` | Score an existing string instead of generating | — |
+| `--update` | Self-update from GitHub releases | requires `curl` |
+| `--test` | Run bundled tests | — |
+| `--help`, `-h` | Print help | — |
 
-## Complexity Analysis
+## How it works
 
-The password analysis includes:
+1. Draw a handful of cat names from the embedded dictionary
+2. Join them lowercase into a phrase
+3. Randomly capitalize a few characters
+4. Insert digits at random positions
+5. Substitute symbols for select letters
+6. Repeat steps 1–5 five times to produce candidates
+7. Score each candidate; emit the one with the lowest (best) composite score
 
-- **Shannon Entropy**: Information entropy in bits per character
-- **Compression Ratio**: Kolmogorov complexity approximation
-- **Pattern Complexity**: Substring uniqueness score
-- **Character Diversity**: Coverage of lowercase, uppercase, digits, symbols
+## Complexity metrics
+
+Internally these are the standard names; in CLI output they wear catified labels.
+
+| Internal | CLI label | What it measures |
+|---|---|---|
+| Shannon entropy | Ball of Yarn Entropy | Bits of information per character |
+| Compression ratio | Mashing Resistance | How repetitive the string is (lower = better) |
+| Pattern complexity | Shiny Foil Ball Uniqueness | Substring uniqueness vs length |
+| Character diversity | Organic NonGMO Catnip | Coverage of lower/upper/digits/symbols |
+| Composite score | Overall Relavency | Weighted blend — **lower is better** |
 
 ## Requirements
 
 - C11 compiler (gcc or clang)
-- Linux system
-- Optional: xclip for clipboard support
+- Linux or macOS
+- Optional: `xclip` or `wl-copy` on Linux, or `pbcopy` on macOS, for `--copy`
+- Optional: `curl` for `--update`
+
+## Project layout
+
+```
+src/         core C — main, config, password, complexity, random, display, update
+src/catnames.c     embedded cat-name dictionary (16,913 entries)
+tests/       unit tests run by --test
+features/    BDD/behave feature files
+docs/        marketing site (GitHub Pages)
+```
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT — see [LICENSE](LICENSE).
 
 ## Author
 
@@ -97,4 +131,4 @@ Jeffrey Kunzelman
 
 ## Credits
 
-Original Swift implementation: MeowPassword
+Original Swift implementation: [MeowPassword](https://github.com/SpaceTrucker2196/MeowPassword).

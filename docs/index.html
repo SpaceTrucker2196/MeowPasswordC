@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>meowpass — phrase passwords from 16,913 cat names</title>
+<meta name="description" content="A C11 password generator that builds memorable phrase-passwords from 16,913 embedded cat names, scores them with catified Kolmogorov-style complexity analysis, and hands you the best of five.">
+<meta property="og:title" content="meowpass — cats are more complex than dogs">
+<meta property="og:description" content="Phrase passwords from cat names. Pure C11. Vaporwave. White-hat.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Orbitron:wght@500;700;900&family=Space+Grotesk:wght@400;500;600;700&family=VT323&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<!-- ── Vaporwave sun + grid + paw silhouettes ────────────────────── -->
+<svg class="canopy-overlay" viewBox="0 0 1200 720" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs>
+    <linearGradient id="vw-sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"    stop-color="#ffec3d"/>
+      <stop offset="0.45" stop-color="#ff6b35"/>
+      <stop offset="0.85" stop-color="#ff006e"/>
+      <stop offset="1"    stop-color="#9f00ff"/>
+    </linearGradient>
+    <linearGradient id="vw-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"    stop-color="#0a0014"/>
+      <stop offset="0.55" stop-color="#1a0033"/>
+      <stop offset="0.85" stop-color="#2d1b69"/>
+      <stop offset="1"    stop-color="#3a1054"/>
+    </linearGradient>
+    <linearGradient id="grid-fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff006e" stop-opacity="0"/>
+      <stop offset="1" stop-color="#ff006e" stop-opacity="0.85"/>
+    </linearGradient>
+    <linearGradient id="grid-fade-cyan" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#00ffe5" stop-opacity="0"/>
+      <stop offset="1" stop-color="#00ffe5" stop-opacity="0.65"/>
+    </linearGradient>
+    <filter id="neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- Paw print symbol -->
+    <symbol id="paw" viewBox="-40 -40 80 80">
+      <ellipse cx="0"   cy="6"   rx="22" ry="16"/>
+      <ellipse cx="-18" cy="-18" rx="7"  ry="9"/>
+      <ellipse cx="-6"  cy="-26" rx="6"  ry="8"/>
+      <ellipse cx="8"   cy="-26" rx="6"  ry="8"/>
+      <ellipse cx="20"  cy="-18" rx="7"  ry="9"/>
+    </symbol>
+    <!-- Cat silhouette: ears + head outline -->
+    <symbol id="cat-head" viewBox="0 0 160 120">
+      <path d="M10,110 L25,30 L55,70 L105,70 L135,30 L150,110 Z"
+            fill="none" stroke-linejoin="round"/>
+      <!-- eyes -->
+      <ellipse cx="60" cy="85" rx="5" ry="9"/>
+      <ellipse cx="100" cy="85" rx="5" ry="9"/>
+    </symbol>
+  </defs>
+
+  <rect width="1200" height="720" fill="url(#vw-sky)"/>
+
+  <!-- sun -->
+  <g filter="url(#neon-glow)">
+    <circle cx="600" cy="320" r="200" fill="url(#vw-sun)"/>
+    <!-- sun horizon slats -->
+    <rect x="380" y="330" width="440" height="14" fill="#0a0014" opacity="0.9"/>
+    <rect x="380" y="360" width="440" height="12" fill="#0a0014" opacity="0.8"/>
+    <rect x="380" y="386" width="440" height="10" fill="#0a0014" opacity="0.7"/>
+    <rect x="380" y="408" width="440" height="9"  fill="#0a0014" opacity="0.55"/>
+    <rect x="380" y="427" width="440" height="8"  fill="#0a0014" opacity="0.4"/>
+  </g>
+
+  <!-- CRT grid floor -->
+  <g stroke="url(#grid-fade)" stroke-width="1.5" fill="none" opacity="0.9">
+    <!-- horizontal -->
+    <line x1="0"    y1="520" x2="1200" y2="520"/>
+    <line x1="0"    y1="555" x2="1200" y2="555"/>
+    <line x1="0"    y1="595" x2="1200" y2="595"/>
+    <line x1="0"    y1="640" x2="1200" y2="640"/>
+    <line x1="0"    y1="695" x2="1200" y2="695"/>
+    <!-- vertical perspective -->
+    <line x1="600" y1="500" x2="-200"  y2="720"/>
+    <line x1="600" y1="500" x2="100"   y2="720"/>
+    <line x1="600" y1="500" x2="350"   y2="720"/>
+    <line x1="600" y1="500" x2="500"   y2="720"/>
+    <line x1="600" y1="500" x2="700"   y2="720"/>
+    <line x1="600" y1="500" x2="850"   y2="720"/>
+    <line x1="600" y1="500" x2="1100"  y2="720"/>
+    <line x1="600" y1="500" x2="1400"  y2="720"/>
+  </g>
+  <g stroke="url(#grid-fade-cyan)" stroke-width="0.6" fill="none" opacity="0.7">
+    <line x1="0" y1="538" x2="1200" y2="538"/>
+    <line x1="0" y1="575" x2="1200" y2="575"/>
+    <line x1="0" y1="618" x2="1200" y2="618"/>
+    <line x1="0" y1="666" x2="1200" y2="666"/>
+  </g>
+
+  <!-- Cat silhouette in front of the sun -->
+  <g transform="translate(520,280)" fill="#0a0014" stroke="#ff006e" stroke-width="2.5" filter="url(#neon-glow)">
+    <use href="#cat-head" width="160" height="120"/>
+  </g>
+
+  <!-- Scattered paw prints (left and right) -->
+  <g fill="#ff2a95" opacity="0.55" filter="url(#neon-glow)">
+    <use href="#paw" x="120"  y="180" width="38" height="38"/>
+    <use href="#paw" x="200"  y="120" width="28" height="28" transform="rotate(20 200 120)"/>
+    <use href="#paw" x="80"   y="260" width="34" height="34" transform="rotate(-15 80 260)"/>
+  </g>
+  <g fill="#00ffe5" opacity="0.55" filter="url(#neon-glow)">
+    <use href="#paw" x="1020" y="180" width="38" height="38" transform="rotate(-12 1020 180)"/>
+    <use href="#paw" x="1100" y="120" width="28" height="28"/>
+    <use href="#paw" x="1080" y="260" width="34" height="34" transform="rotate(10 1080 260)"/>
+  </g>
+</svg>
+
+<!-- ── Header ─────────────────────────────────────────────────────── -->
+<header class="site-header">
+  <nav class="nav" aria-label="Primary">
+    <a class="brand" href="#top">
+      <span class="paw">🐾</span>
+      <span>meowpass<span class="dot">.c</span></span>
+    </a>
+    <div class="nav-links">
+      <a href="#how">How</a>
+      <a href="#mythos">Mythos</a>
+      <a href="#usage">Usage</a>
+      <a href="#build">Build</a>
+    </div>
+    <a class="nav-cta" href="https://github.com/SpaceTrucker2196/MeowPasswordC" target="_blank" rel="noopener">GitHub →</a>
+  </nav>
+</header>
+
+<!-- ── Hero ───────────────────────────────────────────────────────── -->
+<section class="hero" id="top">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">// pure c11 · single binary · 16,913 cats</p>
+    <h1>meowpass</h1>
+    <p class="hero-tag">Cats are more complex than dogs.</p>
+
+    <pre class="ascii-cat" aria-hidden="true">                         _,-;'''`' - .
+                      _/',  `;  `;    \
+      ,        _..,-''    '   `  `      `\
+     | ;._.,,-' .| |,_     '   '         `\
+     | `;'      ;' ;, `,   ; |    '  '  .   \
+     `; __`  ,'__  ` ,  ` ;  |      ;        \
+     ; (6_);  (6_) ; |   ,    \        '      |
+    ;;   _,6 ,.    ` `,   '    `-._           //
+     ,;.=..`_..=.,' -'          ,''        _,//
+_00_____`"=,,,==",___,,,-----'''----'_'_'_''______00_
+        Meow Password Generators of Secure Relavant
+                               __,,-' /'
+                             /'_,,--''
+                            | (
+                             `'</pre>
+
+    <div class="hero-cta">
+      <a class="btn btn-pink" href="#build">Build it →</a>
+      <a class="btn" href="https://github.com/SpaceTrucker2196/MeowPasswordC" target="_blank" rel="noopener">Source on GitHub</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── What it does ──────────────────────────────────────────────── -->
+<section id="how">
+  <div class="section-inner">
+    <p class="section-eyebrow">// how it works</p>
+    <h2>Five candidates, one survivor.</h2>
+    <p class="lead">
+      meowpass joins a handful of randomly-drawn cat names into a phrase, sprinkles
+      it with capitals, digits, and symbols, then runs the result through a stack
+      of complexity heuristics. It does this five times. The candidate with the
+      <em>least</em> compressible, <em>most</em> diverse, <em>highest</em>-entropy
+      score wins and lands on your clipboard.
+    </p>
+
+    <div class="feature-grid">
+      <div class="feature">
+        <div class="icon">🐾</div>
+        <h4>16,913 embedded cats</h4>
+        <p>The full dictionary ships in the binary. No data files. No network. No surprise downloads.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">🔐</div>
+        <h4>OS-grade randomness</h4>
+        <p>Bytes come from <code>getrandom()</code> / <code>/dev/urandom</code> with rejection sampling — modulo bias free.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">🧶</div>
+        <h4>Best-of-five selection</h4>
+        <p>Generates five candidates, scores each with four metrics, picks the one a cat would have the hardest time guessing.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">📋</div>
+        <h4>Quiet copy mode</h4>
+        <p><code>--psssst</code> generates and copies the winner without ever printing it to your terminal.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">🔍</div>
+        <h4>Analyze any string</h4>
+        <p><code>--analyze "foo"</code> runs the same metrics on a password you already have.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">⚙️</div>
+        <h4>One binary, no deps</h4>
+        <p>Pure C11. Builds with make or cmake. Optional xclip / wl-copy / pbcopy for clipboard.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── The mythos ────────────────────────────────────────────────── -->
+<section id="mythos" class="alt">
+  <div class="section-inner">
+    <p class="section-eyebrow">// the mythos</p>
+    <h2>Pawthropology of complexity.</h2>
+    <p class="lead">
+      Under the hood, meowpass scores each candidate with four real metrics —
+      Shannon entropy, a compression-ratio approximation, pattern uniqueness, and
+      character-class diversity. In the CLI, they wear catified labels because
+      passwords should be a little fun.
+    </p>
+
+    <div class="mythos">
+      <div class="metric">
+        <span class="cat-label">Tail Size</span>
+        <div class="real-label">// password length</div>
+        <p>How many characters long the candidate ended up. Longer tails are harder to grab.</p>
+      </div>
+      <div class="metric">
+        <span class="cat-label">Ball of Yarn Entropy</span>
+        <div class="real-label">// shannon entropy (bits/char)</div>
+        <p>Measures how unpredictable each character is on average. A tightly-wound ball of yarn is harder to follow.</p>
+      </div>
+      <div class="metric">
+        <span class="cat-label">Mashing Resistance</span>
+        <div class="real-label">// compression-ratio approximation</div>
+        <p>If a string compresses well, it's repetitive. We want strings that resist a cat's enthusiastic keyboard mashing.</p>
+      </div>
+      <div class="metric">
+        <span class="cat-label">Shiny Foil Ball Uniqueness</span>
+        <div class="real-label">// pattern complexity</div>
+        <p>Counts how many distinct substrings the password contains relative to its length. Crinkly is good.</p>
+      </div>
+      <div class="metric">
+        <span class="cat-label">Organic NonGMO Catnip</span>
+        <div class="real-label">// character-class diversity</div>
+        <p>Mix of lowercase, uppercase, digits, and symbols. A balanced bowl is more intoxicating to entropy.</p>
+      </div>
+      <div class="metric">
+        <span class="cat-label">Overall Relavency</span>
+        <div class="real-label">// composite score · lower is better</div>
+        <p>A weighted blend. <strong>High relevance is bad</strong> — cats find relevant passwords easy to crack. Aim low.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:3rem">The verdicts</h3>
+    <div class="ladder">
+      <div class="rung">
+        <div class="range">&lt; 2.0</div>
+        <div class="quip">🐱 Purrfect! Fur-midably complex. Even the cleverest cats can't crack it.</div>
+      </div>
+      <div class="rung warn">
+        <div class="range">&lt; 4.0</div>
+        <div class="quip">😺 Not bad, hooman! Decent whisker-resistance.</div>
+      </div>
+      <div class="rung mid">
+        <div class="range">&lt; 6.0</div>
+        <div class="quip">😿 Meow… too easy for a clever cat to guess.</div>
+      </div>
+      <div class="rung high">
+        <div class="range">≥ 6.0</div>
+        <div class="quip">🙀 Hiss! A kitten could paw this one open.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Usage ─────────────────────────────────────────────────────── -->
+<section id="usage">
+  <div class="section-inner">
+    <p class="section-eyebrow">// usage</p>
+    <h2>Flags &amp; recipes.</h2>
+
+    <pre><code># default — generate, score, show, copy hint
+meowpass
+
+# tune the recipe
+meowpass --numbers 4 --symbols 3 --max-length 30
+
+# silent — copy the winner to the clipboard, print nothing
+meowpass --psssst
+
+# audit a string you already have
+meowpass --analyze "MyP@ssw0rd!"
+
+# run the test suite
+meowpass --test
+
+# check GitHub for a newer release and install it
+meowpass --update</code></pre>
+
+    <table class="flag-table">
+      <thead>
+        <tr><th>Flag</th><th>What it does</th><th>Range / default</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>--numbers N</td><td>Random digits sprinkled into the phrase</td><td>1–10 · default 1–4</td></tr>
+        <tr><td>--symbols N</td><td>Letter→symbol substitutions</td><td>1–10 · default 2</td></tr>
+        <tr><td>--max-length N</td><td>Cap on the final password length</td><td>15–50 · default 25</td></tr>
+        <tr><td>--copy</td><td>Copy the winner to the clipboard after display</td><td>pbcopy / xclip / wl-copy</td></tr>
+        <tr><td>--psssst, -p</td><td>Silent mode — copy only, never print</td><td>—</td></tr>
+        <tr><td>--analyze, -a S</td><td>Score an existing string instead of generating</td><td>—</td></tr>
+        <tr><td>--update</td><td>Self-update from GitHub releases</td><td>requires curl</td></tr>
+        <tr><td>--test</td><td>Run the bundled test suite</td><td>—</td></tr>
+        <tr><td>--help, -h</td><td>Print the help screen</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── Build ─────────────────────────────────────────────────────── -->
+<section id="build" class="alt">
+  <div class="section-inner">
+    <p class="section-eyebrow">// build</p>
+    <h2>Two ways in.</h2>
+    <p class="lead">
+      C11. No external dependencies. Builds on Linux and macOS. Clipboard wants
+      <code>xclip</code> or <code>wl-copy</code> (Linux) or uses <code>pbcopy</code> (macOS, included).
+    </p>
+
+    <h3>Make</h3>
+<pre><code>git clone https://github.com/SpaceTrucker2196/MeowPasswordC.git
+cd MeowPasswordC
+make
+./meowpass</code></pre>
+
+    <h3>CMake</h3>
+<pre><code>cmake -B build
+cmake --build build
+./build/meowpass</code></pre>
+
+    <h3>Install system-wide</h3>
+<pre><code>sudo make install</code></pre>
+  </div>
+</section>
+
+<!-- ── Footer ─────────────────────────────────────────────────────── -->
+<footer class="site-footer">
+  <p>
+    <span class="paws">🐾</span>
+    MIT · pure C11 · 16,913 cats
+    <span class="paws">🐾</span>
+  </p>
+  <p>
+    <a href="https://github.com/SpaceTrucker2196/MeowPasswordC">github</a> ·
+    <a href="https://github.com/SpaceTrucker2196/MeowPasswordC/releases">releases</a> ·
+    <a href="https://github.com/SpaceTrucker2196/MeowPasswordC/blob/main/LICENSE">license</a>
+  </p>
+</footer>
+
+</body>
+</html>
