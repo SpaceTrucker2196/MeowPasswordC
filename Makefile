@@ -47,6 +47,11 @@ debug: clean $(TARGET)
 test: $(TARGET)
 	./$(TARGET) --test
 
+# Mutation testing — see docs/MUTATION-TESTING.md
+.PHONY: mutate
+mutate:
+	python3 .github/scripts/mutate.py --files src/complexity.c $(MUTATE_FLAGS)
+
 # Clean build artifacts
 clean:
 	rm -f $(OBJECTS) $(TARGET)

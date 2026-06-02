@@ -1,0 +1,28 @@
+# Mutation-testing equivalence file
+#
+# Documented-equivalent mutations to suppress from the survivor count.
+# Each non-blank, non-comment line:
+#
+#     <file>:<line>:<op>:<original>:<mutated>    # optional comment
+#
+# Match is exact on all five fields, except line may be M-N for a range
+# and op/original/mutated may each be `*` to match anything. When a
+# mutant's fingerprint matches, it's reported as IGNORED rather than
+# SURVIVED, and the effective kill rate is computed as
+# killed / (total - ignored).
+#
+# Adding entries is a deliberate act:
+#   - Verify the mutation is *truly* equivalent (no observable behaviour
+#     change for any reasonable input the function sees).
+#   - Cite the equivalence class in the trailing comment so the next
+#     reviewer can re-verify.
+#
+# Equivalence classes (extend in docs/MUTATION-TESTING.md):
+#   OPT  - early-return optimisation guard (correctness unaffected;
+#          mutation only causes wasted work)
+#   WGT  - composite-score weight constant where the literal ±1
+#          perturbation can't shift bucketed output
+#   LZT  - loop bound reading zero-initialised tail (e.g. unused
+#          char_counts[] slots)
+#
+# Start empty. Earn each entry by triaging a real survivor.
