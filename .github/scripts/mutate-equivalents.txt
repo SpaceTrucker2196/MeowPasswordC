@@ -24,6 +24,15 @@
 #          perturbation can't shift bucketed output
 #   LZT  - loop bound reading zero-initialised tail (e.g. unused
 #          char_counts[] slots)
+#   FAB  - function/local-as-boolean: any non-zero replacement is
+#          still truthy and observably equivalent
+#   ALG  - allocator-internal sizing/growth literal that changes how
+#          memory is acquired but not the algorithm's output
+#   SAN  - sanitizer-detectable memory bug (buffer overrun, read-past-
+#          end, free-of-uninitialised). Survives our -O0 test build
+#          because macOS's allocator doesn't fault; would be killed by
+#          a re-run with `make CFLAGS='-O0 -g -fsanitize=address,undefined'`
+#          (see docs/MUTATION-TESTING.md for the ASAN run target)
 #
 # Start empty. Earn each entry by triaging a real survivor.
 
@@ -34,3 +43,14 @@ src/complexity.c:34:rel:<:<=          # LZT: char_counts[256] is read past array
 src/complexity.c:52:const:1:0         # OPT: run_length init is overwritten on the first loop iteration's else branch (i=0 always differs from '\0')
 src/complexity.c:167:const:10:11      # WGT: score cap unreachable — max composite is ~3.1 given the current 0.3/0.25/0.2/0.15/0.1 weights and component ranges
 src/complexity.c:167:const:10:9       # WGT: same — even a 9.0 cap exceeds the max achievable composite
+
+# Round 2 — pattern_complexity equivalents
+src/complexity.c:76:const:2:1         # OPT: `if (len < 2)` → `if (len < 1)`. For len=1 the outer loop never runs (slen starts at 2 > 1) so both paths return 0.0 via the total_substrings==0 guard at L127.
+src/complexity.c:93:const:1:2         # FAB: `int is_unique = 1` used purely as boolean (only checked via `if (is_unique)`); any non-zero value is observably identical.
+src/complexity.c:105:const:64:65      # ALG: initial substr_capacity literal; affects realloc cadence, not output.
+src/complexity.c:105:const:64:63      # ALG: same.
+src/complexity.c:105:const:2:3        # ALG: realloc growth factor (2x → 3x); changes capacity progression, not unique-substring count.
+src/complexity.c:110:const:1:2        # ALG: `malloc(slen + 1)` → `malloc(slen + 2)`; one extra byte is harmless tail.
+src/complexity.c:110:arith:+:-        # SAN: `malloc(slen + 1)` → `malloc(slen - 1)`; heap overflow on the strncpy+null-terminator that follows. Killed by ASAN.
+src/complexity.c:110:const:1:0        # SAN: `malloc(slen + 1)` → `malloc(slen)`; one-byte overflow on the null terminator. Killed by ASAN.
+src/complexity.c:122:rel:<:<=         # SAN: free-loop `i < substr_count` → `i <= substr_count`; frees one uninitialised slot past the populated range. Killed by ASAN.

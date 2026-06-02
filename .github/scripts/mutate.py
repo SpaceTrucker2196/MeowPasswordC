@@ -443,10 +443,17 @@ def run_make_test(workdir: Path, timeout_s: float) -> tuple[bool, str]:
     which make then treats as up-to-date and skips the rebuild.
     -B forces unconditional rebuild — exactly what mutation testing
     requires.
+
+    CFLAGS is overridden to -O0 -g so that optimizer-driven equivalences
+    don't mask real mutations. The clearest case is a null-guard like
+    `if (!str || *str == '\\0')` — at -O2 the compiler folds the
+    mutated `&&` variant to "always false" via UB-assumption, hiding
+    a mutation that would otherwise crash on NULL inputs.
     """
+    cflags = "-Wall -Wextra -pedantic -std=c11 -O0 -g"
     try:
         r = subprocess.run(
-            ["make", "-B", "test"],
+            ["make", "-B", "test", f"CFLAGS={cflags}"],
             cwd=workdir,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,

@@ -81,10 +81,58 @@ Skip `src/catnames.c` (data) and `src/display.c` (printf formatting).
 `.github/scripts/mutate-equivalents.txt` lists mutations that are
 provably equivalent (no observable behaviour change). Adding an entry
 is a deliberate act — it permanently suppresses that mutant from the
-survivor count. Always cite the class (`OPT`, `WGT`, `LZT`, …) in the
-trailing comment.
+survivor count. Always cite the class in the trailing comment.
+
+Established classes:
+
+| Code | Meaning |
+|---|---|
+| `OPT` | Early-return guard whose mutation only causes wasted work — both paths return the same value for the inputs the function can see. |
+| `WGT` | Weight / cap literal in a scoring formula whose ±1 perturbation can never produce a different output given the value ranges of the other terms. |
+| `LZT` | Loop bound that reads into a zero-initialised tail (e.g. unused `char_counts[]` slots) where the past-end value is unobservable. |
+| `FAB` | Function- or local-as-boolean: any non-zero replacement is truthy and equivalent to `1`. |
+| `ALG` | Allocator-internal sizing or growth literal — changes how memory is acquired without changing algorithm output. |
+| `SAN` | Sanitizer-detectable memory bug (heap overrun, read-past-end, free-of-uninitialised). Survives our default `-O0 -g` build because macOS's allocator doesn't fault; would be killed by re-running with ASAN/UBSAN. See "ASAN run" below. |
 
 Start empty. Earn each entry by triaging a real survivor.
+
+## Why the harness builds at `-O0`
+
+The harness forces `CFLAGS=-Wall -Wextra -pedantic -std=c11 -O0 -g`
+when it invokes `make -B test`. At `-O2`, gcc folds away mutations
+that violate undefined-behaviour assumptions — most visibly, a
+null-guard like `if (!str || *str == '\0')` mutated to `&&` becomes
+"always false" under UB-assumption, hiding what would otherwise be a
+NULL-deref kill on every empty-string test call. Three real
+null-guard mutations survived at `-O2` and all died at `-O0`. The
+trade-off is small — `-O0` builds run ~0.6s each instead of ~0.5s.
+
+## ASAN run (for the `SAN` class)
+
+Some mutations are real memory-safety regressions that don't crash on
+macOS's libc allocator without instrumentation — buffer overruns by
+one byte, freeing uninitialised pointers from a one-past free loop.
+The `SAN`-tagged equivalents are not truly equivalent; they're
+out-of-scope for the default run.
+
+To verify they'd be caught under sanitizers, drop the equivalents
+file temporarily and re-run with:
+
+```sh
+make CFLAGS='-O0 -g -fsanitize=address,undefined' test
+```
+
+…then re-run a targeted mutation:
+
+```sh
+python3 .github/scripts/mutate.py --files src/complexity.c \
+    --operators arith --ignore-file /dev/null
+```
+
+(The harness build command is hardcoded; for an ASAN mutation campaign
+you'd patch `run_make_test` in `mutate.py` to include the sanitizer
+flags. Worth doing as a separate round when the codebase grows enough
+to justify a clean memory-safety baseline.)
 
 ## Reading the report
 
