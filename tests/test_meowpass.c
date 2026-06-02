@@ -419,6 +419,174 @@ static void test_complexity_boundaries(void) {
 }
 
 /**
+ * Round-1 mutation gap closers for src/password.c.
+ *
+ * The three public transforms are RNG-driven but have deterministic
+ * counts: after randomly_capitalize(s, k), exactly min(k, letter_count)
+ * letters are uppercase; after insert_random_numbers(s, sz, k), the
+ * digit count is exactly k (since the base phrase has none); after
+ * replace_with_symbols(s, k), exactly min(k, letter_count) letters
+ * are replaced by symbols. Pinning those counts kills the bulk of
+ * mutations to the loop bounds, guards, and target-count math.
+ */
+static void test_password_transforms(void) {
+    printf("\nTesting Meow Password Transforms...\n");
+
+    /* ── randomly_capitalize ── */
+
+    /* Guards */
+    {
+        char e[1] = "";
+        randomly_capitalize(e, 3);
+        assert_true(e[0] == '\0', "capitalize empty leaves empty");
+    }
+    {
+        char s[] = "abcdef";
+        randomly_capitalize(s, 0);
+        assert_true(strcmp(s, "abcdef") == 0, "capitalize count=0 unchanged");
+    }
+    {
+        char s[] = "12345";
+        randomly_capitalize(s, 3);
+        assert_true(strcmp(s, "12345") == 0, "capitalize no-letters unchanged");
+    }
+
+    /* Exact upper count: min(count, letter_count). Repeat across trials
+     * to catch shuffle-bound mutations that occasionally produce wrong
+     * counts non-deterministically. */
+    for (int t = 0; t < 6; t++) {
+        char s[] = "abcdefgh";   /* 8 letters */
+        randomly_capitalize(s, 3);
+        int upper = 0;
+        for (char *c = s; *c; c++) if (isupper((unsigned char)*c)) upper++;
+        assert_equal_int(upper, 3, "capitalize 3 of 8 → upper==3");
+    }
+    {
+        char s[] = "abc";
+        randomly_capitalize(s, 10);
+        int upper = 0;
+        for (char *c = s; *c; c++) if (isupper((unsigned char)*c)) upper++;
+        assert_equal_int(upper, 3, "capitalize count>letters caps at letter_count");
+    }
+    /* Boundary: count == letter_count */
+    {
+        char s[] = "abcdef";   /* 6 letters */
+        randomly_capitalize(s, 6);
+        int upper = 0;
+        for (char *c = s; *c; c++) if (isupper((unsigned char)*c)) upper++;
+        assert_equal_int(upper, 6, "capitalize count==letters → all upper");
+    }
+
+    /* ── insert_random_numbers ── */
+
+    /* count=0 */
+    {
+        char s[16] = "abc";
+        insert_random_numbers(s, sizeof(s), 0);
+        assert_true(strcmp(s, "abc") == 0, "insert count=0 unchanged");
+    }
+
+    /* Exact digit count and length growth. */
+    for (int t = 0; t < 6; t++) {
+        char s[32] = "abcdef";
+        insert_random_numbers(s, sizeof(s), 5);
+        int digits = 0;
+        for (char *c = s; *c; c++) if (isdigit((unsigned char)*c)) digits++;
+        assert_equal_int(digits, 5, "insert adds exactly count digits");
+        assert_equal_int((int)strlen(s), 11, "insert grows length by count");
+    }
+
+    /* Capacity boundary: stops at password_size - 1.
+     * Pre-fill with sentinel; verify byte at index password_size is untouched. */
+    {
+        char s[20];
+        memset(s, 'X', sizeof(s));
+        s[19] = 'X';   /* keep sentinel intact */
+        strcpy(s, "abcdef");   /* writes [0..6] inclusive (the '\0') */
+        insert_random_numbers(s, 10, 100);
+        assert_equal_int((int)strlen(s), 9, "insert respects password_size-1");
+        assert_equal_int((unsigned char)s[10], 'X', "insert does not write past password_size-1");
+    }
+
+    /* ── replace_with_symbols ── */
+
+    {
+        char e[1] = "";
+        replace_with_symbols(e, 3);
+        assert_true(e[0] == '\0', "replace empty leaves empty");
+    }
+    {
+        char s[] = "abcdef";
+        replace_with_symbols(s, 0);
+        assert_true(strcmp(s, "abcdef") == 0, "replace count=0 unchanged");
+    }
+    {
+        char s[] = "12345";
+        replace_with_symbols(s, 3);
+        assert_true(strcmp(s, "12345") == 0, "replace no-letters unchanged");
+    }
+
+    /* Exact letter/symbol counts. The base has only lowercase letters,
+     * so post-replace: letters = original - k, symbols = k. */
+    for (int t = 0; t < 6; t++) {
+        char s[] = "abcdefgh";   /* 8 letters, 0 digits */
+        replace_with_symbols(s, 3);
+        int letters = 0, others = 0;
+        for (char *c = s; *c; c++) {
+            if (isalpha((unsigned char)*c))      letters++;
+            else if (!isdigit((unsigned char)*c)) others++;
+        }
+        assert_equal_int(letters, 5, "replace leaves 8-3=5 letters");
+        assert_equal_int(others,  3, "replace adds exactly 3 symbols");
+    }
+    /* Cap: count > letter_count */
+    {
+        char s[] = "abc";
+        replace_with_symbols(s, 10);
+        int letters = 0, others = 0;
+        for (char *c = s; *c; c++) {
+            if (isalpha((unsigned char)*c))      letters++;
+            else if (!isdigit((unsigned char)*c)) others++;
+        }
+        assert_equal_int(letters, 0, "replace count>letters consumes all letters");
+        assert_equal_int(others,  3, "replace count>letters caps at letter_count");
+    }
+
+    /* ── generate_password indirect invariants ── */
+
+    /* Base phrase has no spaces or digits before transforms, so the
+     * final password has no spaces. After capitalize(s,3): upper count
+     * is min(3, letter_count_at_that_point). After all transforms the
+     * count holds within ±1 of 3 (since later symbol replacement may
+     * eat an upper). Use a wide budget so we still get a few letters. */
+    for (int t = 0; t < 6; t++) {
+        char p[MAX_PASSWORD_LENGTH] = {0};
+        PasswordConfig c;
+        c.num_numbers = 3; c.num_symbols = 2; c.max_length = 25;
+        c.show_tests = false; c.copy_to_clipboard = false;
+        c.psssst = false; c.show_help = false;
+        c.check_update = false; c.analyze_string = NULL;
+        generate_password(&c, p, sizeof(p));
+
+        int spaces = 0;
+        for (char *q = p; *q; q++) if (*q == ' ') spaces++;
+        assert_equal_int(spaces, 0, "generate: append_name strips spaces");
+
+        int upper = 0;
+        for (char *q = p; *q; q++) if (isupper((unsigned char)*q)) upper++;
+        /* capitalize hardcodes 3; symbol-replace may consume up to num_symbols
+         * of those uppers, so upper ∈ [3 - num_symbols, 3]. */
+        assert_true(upper >= 3 - c.num_symbols && upper <= 3,
+                    "generate: capitalize hardcoded count=3 (within symbol churn)");
+
+        assert_true(strlen(p) <= (size_t)c.max_length,
+                    "generate: respects max_length");
+    }
+
+    printf("Meow password transform tests done!\n");
+}
+
+/**
  * Run all tests (exported function)
  */
 int run_tests(void) {
@@ -430,6 +598,7 @@ int run_tests(void) {
     test_shannon_entropy();
     test_character_diversity();
     test_complexity_boundaries();
+    test_password_transforms();
     test_config_parsing();
     test_relevancy_score_explanation();
     test_update_version_compare();
