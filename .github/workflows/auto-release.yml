@@ -14,6 +14,10 @@ permissions:
 
 jobs:
   build-test-release:
+    # Only run on the source repo; the mirror at river-io/MeowPasswordC
+    # gets this file via the mirror push, but should not auto-release
+    # — that would diverge the mirror's version from the source.
+    if: github.repository == 'SpaceTrucker2196/MeowPasswordC'
     runs-on: ubuntu-latest
 
     steps:
