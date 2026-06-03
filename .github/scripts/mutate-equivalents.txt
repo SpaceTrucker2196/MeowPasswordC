@@ -39,6 +39,17 @@
 #          libcurl substitute. Out of scope for the unit suite;
 #          documented so the survivor count reflects what the unit
 #          tests CAN reach.
+#   DCB  - dead code branch: mutation lives in code that the test
+#          build's #ifdef path doesn't compile (e.g. the production
+#          arc4random / getrandom paths in src/random.c are excluded
+#          under -DMEOW_TEST_RNG, so mutations there produce a
+#          binary identical to the unmutated one). Killing requires
+#          a separate mutate pass without -DMEOW_TEST_RNG against the
+#          production build, which is outside this harness's default.
+#   DRC  - dead reachable code: the branch IS compiled, but no caller
+#          ever drives it down the mutated path (e.g. the >8-byte
+#          chunk arithmetic in the test PRNG, where the only caller
+#          requests 4 bytes).
 #
 # Start empty. Earn each entry by triaging a real survivor.
 
@@ -183,3 +194,35 @@ src/update.c:95:rel:>:>=              # IO: fread loop condition `n > 0`.
 src/update.c:95:arith:+:-             # IO: `buf + total` pointer math inside fread call.
 src/update.c:95:arith:-:+             # IO: `sizeof(buf) - total - 1` byte count, first `-`.
 src/update.c:95:arith:-:+             # IO: same, second `-`.
+
+# ------------------------------------------------------------
+# src/random.c — RNG primitives
+# ------------------------------------------------------------
+# L59-60: test PRNG memcpy chunk arithmetic. The `len > 8` and
+# `len + got` paths are dead-reachable in tests because the only
+# caller (meow_random_u32) requests exactly 4 bytes.
+src/random.c:59:rel:>:>=              # DRC: `(len-got) > 8` → `>=`; only matters when len-got reaches 8 (caller requests 4).
+src/random.c:59:arith:-:+             # DRC: first `-` in `(len - got)`; got=0 for the only iteration on len=4.
+src/random.c:59:arith:-:+             # DRC: second `-` in `(len - got)` ternary fallback; same reason.
+src/random.c:59:const:8:9             # DRC: chunk-size literal; caller never crosses the threshold.
+src/random.c:59:const:8:7             # DRC: same.
+src/random.c:59:const:8:9             # DRC: same.
+src/random.c:59:const:8:7             # DRC: same.
+src/random.c:60:arith:+:-             # DRC: `memcpy(p + got, ...)` → `p - got`; got=0 on the only iteration so `p ± 0 = p`.
+# L109: rejection-sampling boundary
+src/random.c:109:rel:>=:>             # DRC: `r >= threshold` → `>`; only differs when r == threshold (1 / 2^32 chance per call under xorshift).
+# L69-85: production CSPRNG branches (getrandom / /dev/urandom / abort).
+# All gated behind `#elif defined(MEOW_HAVE_ARC4RANDOM)` / `#else` —
+# under -DMEOW_TEST_RNG the test PRNG branch is compiled instead, so
+# these lines are never assembled into the test binary.
+src/random.c:69:rel:<:<=              # DCB: getrandom() loop; not compiled under MEOW_TEST_RNG.
+src/random.c:70:arith:+:-             # DCB: same path.
+src/random.c:70:arith:-:+             # DCB: same.
+src/random.c:71:rel:<:<=              # DCB: getrandom error check.
+src/random.c:72:rel:==:!=             # DCB: EINTR retry guard.
+src/random.c:78:rel:<:<=              # DCB: fallback `if (got < len)` guard for /dev/urandom.
+src/random.c:81:arith:+:-             # DCB: fread pointer math in fallback.
+src/random.c:81:arith:-:+             # DCB: fread byte-count in fallback.
+src/random.c:81:const:1:2             # DCB: fread element-size literal.
+src/random.c:81:const:1:0             # DCB: same.
+src/random.c:85:rel:!=:==             # DCB: post-fallback failure check that triggers abort().

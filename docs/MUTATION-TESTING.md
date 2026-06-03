@@ -93,6 +93,9 @@ Established classes:
 | `FAB` | Function- or local-as-boolean: any non-zero replacement is truthy and equivalent to `1`. |
 | `ALG` | Allocator-internal sizing or growth literal — changes how memory is acquired without changing algorithm output. |
 | `SAN` | Sanitizer-detectable memory bug (heap overrun, read-past-end, free-of-uninitialised). Survives our default `-O0 -g` build because macOS's allocator doesn't fault; would be killed by re-running with ASAN/UBSAN. See "ASAN run" below. |
+| `IO` | Mutation is inside an IO/network/interactive path (popen, fread loop, getchar prompt, system()). Killing requires popen-mocking or a libcurl substitute. Out of scope for the unit suite. |
+| `DCB` | Dead code branch — the test build's `#ifdef` path doesn't compile this code (e.g. production `arc4random`/`getrandom` paths in `src/random.c` are skipped under `-DMEOW_TEST_RNG`). Mutations produce a byte-identical binary. A separate prod-build mutation pass is needed to cover these. |
+| `DRC` | Dead reachable code — the branch IS compiled, but no caller ever drives execution down the mutated path (e.g. the >8-byte chunk math in the test PRNG when the only caller requests 4 bytes). |
 
 Start empty. Earn each entry by triaging a real survivor.
 
