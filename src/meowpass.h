@@ -102,6 +102,17 @@ uint32_t meow_random_u32(void);
  */
 uint32_t meow_random_uniform(uint32_t bound);
 
+#ifdef MEOW_TEST_RNG
+/**
+ * Test-only hook. Seeds a deterministic xorshift64* PRNG that replaces
+ * the OS CSPRNG for the lifetime of the binary. Only declared and
+ * defined when the build defines MEOW_TEST_RNG — the mutation-testing
+ * harness sets this so test outputs are reproducible across mutants.
+ * Never enable in shipped builds.
+ */
+void meow_test_seed(uint64_t seed);
+#endif
+
 /* ============ Cat Names Functions (catnames.c) ============ */
 
 /**

@@ -607,6 +607,70 @@ static void test_password_transforms(void) {
     printf("Meow password transform tests done!\n");
 }
 
+#ifdef MEOW_TEST_RNG
+/**
+ * Seeded snapshot tests. Only compiled when the binary is built with
+ * -DMEOW_TEST_RNG (the mutation-testing harness sets this), at which
+ * point meow_test_seed() pins the RNG to a deterministic xorshift64*.
+ * Any mutation anywhere in the generation pipeline that changes the
+ * byte stream consumed from the RNG yields a different password,
+ * which our exact-string asserts catch.
+ *
+ * Pinned values were captured by running snap_probe with seed N and
+ * the documented config. Refactoring the generation path that changes
+ * the RNG-consumption order will require regenerating these.
+ */
+static void test_password_seeded(void) {
+    printf("\nTesting Meow Seeded Password Determinism...\n");
+
+    char p1[MAX_PASSWORD_LENGTH] = {0};
+    char p2[MAX_PASSWORD_LENGTH] = {0};
+
+    /* Determinism: same seed → byte-identical output */
+    PasswordConfig c = {0};
+    c.num_numbers = 3; c.num_symbols = 2; c.max_length = 25;
+
+    meow_test_seed(42);
+    generate_password(&c, p1, sizeof(p1));
+    meow_test_seed(42);
+    generate_password(&c, p2, sizeof(p2));
+    assert_true(strcmp(p1, p2) == 0, "seeded reproducibility (same seed)");
+
+    /* Pinned snapshot at seed=42 with config {3 nums, 2 syms, max 25} */
+    assert_true(strcmp(p1, "noo0giE_Er8Ar7d;ickens") == 0,
+                "seed=42 snapshot pins entire generate_password chain");
+
+    /* Different seed must differ (vanishingly small false-positive
+     * chance for a 22-char output) */
+    meow_test_seed(43);
+    generate_password(&c, p2, sizeof(p2));
+    assert_true(strcmp(p1, p2) != 0, "seed=43 differs from seed=42");
+
+    /* Quiet config so the snapshot is purely the cat-name shuffle +
+     * capitalize step — no number/symbol churn. Pins shuffle_indices,
+     * pick_random_indices, append_name, and randomly_capitalize as a
+     * single fingerprint. */
+    PasswordConfig c2 = {0};
+    c2.num_numbers = 0; c2.num_symbols = 0; c2.max_length = MAX_LENGTH;
+    meow_test_seed(7);
+    generate_password(&c2, p1, sizeof(p1));
+    assert_true(strcmp(p1, "bonECrushercheYnenne") == 0,
+                "seed=7 quiet snapshot pins shuffle/pick/append/capitalize");
+
+    /* Small max_length=15 forces the per-name append cap and the
+     * post-transform truncate to actually fire. Pins append_name's
+     * `max_length - 1` arithmetic. */
+    PasswordConfig c3 = {0};
+    c3.num_numbers = 4; c3.num_symbols = 2; c3.max_length = 15;
+    meow_test_seed(11);
+    generate_password(&c3, p1, sizeof(p1));
+    assert_true(strcmp(p1, "-86iN1uemanNa6;") == 0,
+                "seed=11 small-max snapshot pins append cap + truncate");
+
+    printf("Meow seeded password tests done!\n");
+}
+#endif /* MEOW_TEST_RNG */
+
 /**
  * Run all tests (exported function)
  */
@@ -620,6 +684,9 @@ int run_tests(void) {
     test_character_diversity();
     test_complexity_boundaries();
     test_password_transforms();
+#ifdef MEOW_TEST_RNG
+    test_password_seeded();
+#endif
     test_config_parsing();
     test_relevancy_score_explanation();
     test_update_version_compare();

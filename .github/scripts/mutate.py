@@ -450,7 +450,7 @@ def run_make_test(workdir: Path, timeout_s: float) -> tuple[bool, str]:
     mutated `&&` variant to "always false" via UB-assumption, hiding
     a mutation that would otherwise crash on NULL inputs.
     """
-    cflags = "-Wall -Wextra -pedantic -std=c11 -O0 -g"
+    cflags = "-Wall -Wextra -pedantic -std=c11 -O0 -g -DMEOW_TEST_RNG"
     try:
         r = subprocess.run(
             ["make", "-B", "test", f"CFLAGS={cflags}"],

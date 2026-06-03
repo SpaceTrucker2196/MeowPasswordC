@@ -95,3 +95,23 @@ src/password.c:94:rel:<:<=            # SAN: extras loop overrun.
 src/password.c:94:bool:&&:||          # SAN: same OR-of-guards.
 src/password.c:145:arith:-:+          # SAN: memmove byte-count `len - pos + 1` → `+ pos + 1`; overrun.
 src/password.c:145:const:1:2          # SAN: `len - pos + 1` → `+ 2`; one extra byte.
+src/password.c:197:rel:>:>=           # OPT: the truncate `output[max_length] = '\0'` is a no-op when strlen == max_length, since output[max_length] is already the existing null terminator; both branches produce the same observable result.
+src/password.c:41:const:1:0           # OPT: pick_random_indices `dup = 1` → `dup = 0` disables collision detection; with names_count=16913 and k≤11 the seeded shuffles don't collide, so observable output is unchanged.
+# L76 / L82 — extras computation in select_and_join_names. The else-branch
+# value (5) and the condition arithmetic only matter when the extras loop
+# at L94 actually runs to a different terminating index. In tested
+# configs the extras loop terminates on `out_len < MIN_LENGTH` before
+# consuming all 5 extras, so changes to the extras count don't reach
+# the visible output.
+src/password.c:76:arith:+:-           # OPT: extras condition; never true given names_count=16913 vs actual_count≤6.
+src/password.c:76:arith:-:+           # OPT: only evaluated under the (never-true) condition.
+src/password.c:76:const:5:6           # OPT: extras count change absorbed by MIN_LENGTH-bounded extras loop.
+src/password.c:76:const:5:4           # OPT: same.
+src/password.c:82:arith:-:+           # OPT: same — extras count change absorbed downstream.
+# L89 — main-loop length cap. Mutating `max_length - 1` to `max_length`
+# or `max_length - 2` can lengthen or shorten the base phrase by one
+# character, but the subsequent extras loop / number insert / truncate
+# step normalises the final length back to max_length under tested
+# snapshots, so the observable output is unchanged.
+src/password.c:89:const:1:2           # OPT: cap drift absorbed by downstream truncate.
+src/password.c:89:const:1:0           # OPT: same.
