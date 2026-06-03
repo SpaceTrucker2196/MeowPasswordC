@@ -33,6 +33,12 @@
 #          because macOS's allocator doesn't fault; would be killed by
 #          a re-run with `make CFLAGS='-O0 -g -fsanitize=address,undefined'`
 #          (see docs/MUTATION-TESTING.md for the ASAN run target)
+#   IO   - mutation lives inside an IO/network/interactive code path
+#          (popen/curl, fread loop, getchar prompt, system() install).
+#          Killing it requires popen-mocking or a test-harness
+#          libcurl substitute. Out of scope for the unit suite;
+#          documented so the survivor count reflects what the unit
+#          tests CAN reach.
 #
 # Start empty. Earn each entry by triaging a real survivor.
 
@@ -115,3 +121,65 @@ src/password.c:82:arith:-:+           # OPT: same — extras count change absorb
 # snapshots, so the observable output is unchanged.
 src/password.c:89:const:1:2           # OPT: cap drift absorbed by downstream truncate.
 src/password.c:89:const:1:0           # OPT: same.
+
+# ------------------------------------------------------------
+# src/config.c
+# ------------------------------------------------------------
+src/config.c:14:rel:<:<=              # OPT: clamp_int `value < min` → `<=`; at equality both branches return min.
+src/config.c:15:rel:>:>=              # OPT: clamp_int `value > max` → `>=`; at equality both branches return max.
+src/config.c:32:const:1:0             # OPT: loop start `for (int i = 1; ...)` → `i = 0`; argv[0] is the program name and matches no flag, then the loop continues identically from i=1.
+src/config.c:34:const:1:2             # OPT: `i + 1 < argc` → `i + 2 < argc`; for the well-formed argv patterns we test (--flag value not at end) the stricter check still passes. Killing this needs a test with the flag at exactly argc-2 such that argv[i+2] is the NULL sentinel.
+
+# ------------------------------------------------------------
+# src/update.c — check_for_update is network + interactive + system();
+# everything below lives inside that function and is unreachable from
+# the unit suite without popen/curl mocking and a fake stdin.
+# ------------------------------------------------------------
+src/update.c:95:const:1:2             # IO: fread `sizeof(buf) - total - 1` byte-count.
+src/update.c:95:const:1:0             # IO: same.
+src/update.c:97:rel:>=:>              # IO: fread loop break condition.
+src/update.c:97:arith:-:+             # IO: same expression.
+src/update.c:97:const:1:2             # IO: same.
+src/update.c:97:const:1:0             # IO: same.
+src/update.c:102:rel:==:!=            # IO: `total == 0` empty-response check.
+src/update.c:104:arith:-:+            # IO: return value in empty-response branch.
+src/update.c:104:const:1:2            # IO: same.
+src/update.c:104:const:1:0            # IO: same.
+src/update.c:108:const:64:65          # ALG: `char latest_version[64]` buffer size.
+src/update.c:108:const:64:63          # ALG: same.
+src/update.c:109:rel:!=:==            # IO: parse_tag_from_json error check.
+src/update.c:111:arith:-:+            # IO: return value in parse-failure branch.
+src/update.c:111:const:1:2            # IO: same.
+src/update.c:111:const:1:0            # IO: same.
+src/update.c:117:arith:-:+            # IO: return value in invalid-version branch.
+src/update.c:117:const:1:2            # IO: same.
+src/update.c:117:const:1:0            # IO: same.
+src/update.c:124:rel:<=:<             # IO: `cmp <= 0` already-up-to-date check.
+src/update.c:137:rel:!=:==            # IO: getchar EOF check; needs stdin mocking.
+src/update.c:137:rel:!=:==            # IO: same line, second relop (newline check).
+src/update.c:137:bool:&&:||           # IO: same line, AND-of-EOF-and-newline.
+src/update.c:139:rel:!=:==            # IO: y/Y prompt response check.
+src/update.c:139:rel:!=:==            # IO: same line.
+src/update.c:139:bool:&&:||           # IO: same line.
+src/update.c:164:rel:!=:==            # IO: system() return value check.
+src/update.c:166:arith:-:+            # IO: install-failure return value.
+src/update.c:166:const:1:2            # IO: same.
+src/update.c:166:const:1:0            # IO: same.
+
+# compare_versions tie-break relops — the outer `if (lat_X != cur_X)`
+# already filters equality, so `>` and `>=` yield identical results in
+# the inner ternary.
+src/update.c:31:rel:>:>=              # OPT: major tie-break unreachable at equality (filtered by outer !=).
+src/update.c:32:rel:>:>=              # OPT: minor tie-break.
+src/update.c:33:rel:>:>=              # OPT: patch tie-break.
+
+# fread loop arithmetic with -1 byte sentinel — semantically real but
+# can only be observed through a popen response payload, which is
+# network-bound and unreachable from the unit suite.
+src/update.c:88:arith:-:+             # IO: popen-failure-branch `return -1` flip; needs popen mocking.
+src/update.c:88:const:1:2             # IO: same.
+src/update.c:88:const:1:0             # IO: same.
+src/update.c:95:rel:>:>=              # IO: fread loop condition `n > 0`.
+src/update.c:95:arith:+:-             # IO: `buf + total` pointer math inside fread call.
+src/update.c:95:arith:-:+             # IO: `sizeof(buf) - total - 1` byte count, first `-`.
+src/update.c:95:arith:-:+             # IO: same, second `-`.

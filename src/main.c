@@ -80,6 +80,17 @@ static int find_best_candidate(PasswordCandidate *candidates, int count) {
 }
 
 int main(int argc, char *argv[]) {
+#ifdef MEOW_TEST_RNG
+    /* Mutation-testing build: bypass arg parsing entirely so that
+     * mutations to config.c which break --test detection still cause
+     * the test suite to run. Without this, a mutated parser that
+     * silently drops --test makes the binary fall through to password
+     * generation, which exits 0, and the harness records the mutation
+     * as benign. */
+    (void)argc; (void)argv;
+    return run_tests();
+#endif
+
     /* Parse configuration */
     PasswordConfig config;
     config_init(&config, argc, argv);

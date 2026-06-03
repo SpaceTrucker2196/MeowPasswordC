@@ -12,6 +12,15 @@
 #include <string.h>
 #include "meowpass.h"
 
+/* MP_STATIC: file-internal in production, externally linkable in the
+ * mutation-testing build so tests can call the JSON / version helpers
+ * directly. */
+#ifdef MEOW_TEST_RNG
+#  define MP_STATIC /* exposed for tests */
+#else
+#  define MP_STATIC static
+#endif
+
 int compare_versions(const char *current, const char *latest) {
     int cur_major = 0, cur_minor = 0, cur_patch = 0;
     int lat_major = 0, lat_minor = 0, lat_patch = 0;
@@ -30,7 +39,7 @@ int compare_versions(const char *current, const char *latest) {
  * Looks for "tag_name":"vX.Y.Z" and writes X.Y.Z into out.
  * Returns 0 on success, -1 on failure.
  */
-static int parse_tag_from_json(const char *json, char *out, size_t out_size) {
+MP_STATIC int parse_tag_from_json(const char *json, char *out, size_t out_size) {
     const char *key = "\"tag_name\"";
     const char *pos = strstr(json, key);
     if (!pos) return -1;
@@ -56,7 +65,7 @@ static int parse_tag_from_json(const char *json, char *out, size_t out_size) {
  * Validate that a version string contains only safe characters (digits and dots).
  * Returns 1 if valid, 0 otherwise.
  */
-static int is_valid_version(const char *version) {
+MP_STATIC int is_valid_version(const char *version) {
     if (!version || !*version) return 0;
     for (const char *p = version; *p; p++) {
         if (*p != '.' && (*p < '0' || *p > '9')) return 0;

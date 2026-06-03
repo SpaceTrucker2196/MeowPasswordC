@@ -219,6 +219,95 @@ static void test_config_parsing(void) {
 }
 
 /**
+ * Round-1 mutation gap closers for src/config.c.
+ * Covers the under-tested flags (--help, -h, --update, --test) and
+ * the malformed-argv edge where a flag sits at the last position with
+ * no value behind it (kills the `i + 1 < argc` guard mutations).
+ */
+static void test_config_extra(void) {
+    printf("\nTesting Meow Extra Config Flags...\n");
+
+    /* Help flag — both forms (kills L58 bool || → &&) */
+    {
+        char *argv[] = {"meowpass", "--help"};
+        PasswordConfig c;
+        config_init(&c, 2, argv);
+        assert_true(c.show_help, "--help sets show_help");
+    }
+    {
+        char *argv[] = {"meowpass", "-h"};
+        PasswordConfig c;
+        config_init(&c, 2, argv);
+        assert_true(c.show_help, "-h sets show_help");
+    }
+
+    /* --update */
+    {
+        char *argv[] = {"meowpass", "--update"};
+        PasswordConfig c;
+        config_init(&c, 2, argv);
+        assert_true(c.check_update, "--update sets check_update");
+    }
+
+    /* --test detection at the public API level (separate from the
+     * main() bypass that always runs tests under MEOW_TEST_RNG) */
+    {
+        char *argv[] = {"meowpass", "--test"};
+        PasswordConfig c;
+        config_init(&c, 2, argv);
+        assert_true(c.show_tests, "--test sets show_tests");
+    }
+
+    /* Malformed argv: flag at the final position with no value
+     * behind it. argv[argc] is explicit NULL so the `i + 1 < argc`
+     * guard mutations that turn it into "always true" hit
+     * atoi(NULL) on the next line and crash the process. */
+    {
+        char *argv[] = {"meowpass", "--numbers", NULL};
+        PasswordConfig c;
+        config_init(&c, 2, argv);
+        /* Should not have updated num_numbers from the missing value. */
+        assert_true(c.num_numbers >= 1 && c.num_numbers <= 4,
+                    "--numbers without value stays in default range");
+    }
+    {
+        char *argv[] = {"meowpass", "--symbols", NULL};
+        PasswordConfig c;
+        config_init(&c, 2, argv);
+        assert_equal_int(c.num_symbols, DEFAULT_NUM_SYMBOLS,
+                         "--symbols without value stays default");
+    }
+    {
+        char *argv[] = {"meowpass", "--max-length", NULL};
+        PasswordConfig c;
+        config_init(&c, 2, argv);
+        assert_equal_int(c.max_length, DEFAULT_MAX_LENGTH,
+                         "--max-length without value stays default");
+    }
+
+#ifdef MEOW_TEST_RNG
+    /* Pin the default num_numbers under a known seed — kills L21
+     * mutations to `meow_random_uniform(4) + 1` (range and offset). */
+    {
+        meow_test_seed(99);
+        PasswordConfig c;
+        char *argv[] = {"meowpass"};
+        config_init(&c, 1, argv);
+        assert_equal_int(c.num_numbers, 4, "default num_numbers seed=99 == 4");
+    }
+    {
+        meow_test_seed(123);
+        PasswordConfig c;
+        char *argv[] = {"meowpass"};
+        config_init(&c, 1, argv);
+        assert_equal_int(c.num_numbers, 2, "default num_numbers seed=123 == 2");
+    }
+#endif
+
+    printf("Meow extra config tests done!\n");
+}
+
+/**
  * Test relevancy score explanation in display output
  */
 static void test_relevancy_score_explanation(void) {
@@ -277,8 +366,93 @@ static void test_update_version_compare(void) {
     assert_equal_int(compare_versions("0.0.1", "0.0.2"), 1,
                      "Pre-release newer patch should return 1");
 
+    /* Older-direction tests for minor and major so the `-1` literal
+     * is pinned in every component branch (kills the const 1→2/0
+     * mutations on the negative return). */
+    assert_equal_int(compare_versions("1.1.0", "1.0.0"), -1,
+                     "Older minor should return -1");
+    assert_equal_int(compare_versions("1.1.5", "1.0.9"), -1,
+                     "Older minor (mixed patch) should return -1");
+    assert_equal_int(compare_versions("2.5.0", "1.99.99"), -1,
+                     "Older major should return -1");
+
     printf("Update version comparison tests passed!\n");
 }
+
+#ifdef MEOW_TEST_RNG
+/**
+ * Round-1 mutation gap closers for src/update.c.
+ * Tests parse_tag_from_json and is_valid_version directly (they're
+ * static in production but exposed under -DMEOW_TEST_RNG via the
+ * MP_STATIC macro). Skips check_for_update — it's network-bound and
+ * needs popen/curl mocking that's out of scope here.
+ */
+static void test_update_helpers(void) {
+    printf("\nTesting Meow Update Helpers...\n");
+
+    char out[64];
+
+    /* parse_tag_from_json — happy path */
+    {
+        int r = parse_tag_from_json("{\"tag_name\":\"v1.2.3\",\"other\":1}", out, sizeof(out));
+        assert_equal_int(r, 0, "parse tag_name returns 0");
+        assert_true(strcmp(out, "1.2.3") == 0, "parse tag_name strips leading v");
+    }
+    {
+        int r = parse_tag_from_json("{\"tag_name\":\"V2.0.0\"}", out, sizeof(out));
+        assert_equal_int(r, 0, "parse tag_name accepts uppercase V");
+        assert_true(strcmp(out, "2.0.0") == 0, "uppercase V also stripped");
+    }
+    {
+        int r = parse_tag_from_json("{\"tag_name\":\"0.0.1\"}", out, sizeof(out));
+        assert_equal_int(r, 0, "parse tag_name accepts no v prefix");
+        assert_true(strcmp(out, "0.0.1") == 0, "no v prefix preserved");
+    }
+    /* Whitespace + colon tolerance */
+    {
+        int r = parse_tag_from_json("{\"tag_name\" : \"v1.0.0\"}", out, sizeof(out));
+        assert_equal_int(r, 0, "parse tag_name tolerates whitespace around colon");
+        assert_true(strcmp(out, "1.0.0") == 0, "whitespace ok");
+    }
+
+    /* parse_tag_from_json — failure modes */
+    {
+        int r = parse_tag_from_json("{\"other\":\"v1.0.0\"}", out, sizeof(out));
+        assert_equal_int(r, -1, "parse missing tag_name returns -1");
+    }
+    {
+        int r = parse_tag_from_json("{\"tag_name\":}", out, sizeof(out));
+        assert_equal_int(r, -1, "parse missing quote returns -1");
+    }
+    {
+        int r = parse_tag_from_json("{\"tag_name\":\"\"}", out, sizeof(out));
+        assert_equal_int(r, -1, "parse empty value returns -1");
+    }
+
+    /* is_valid_version */
+    assert_equal_int(is_valid_version("1.2.3"), 1, "version 1.2.3 valid");
+    assert_equal_int(is_valid_version("0.0.0"), 1, "version 0.0.0 valid");
+    assert_equal_int(is_valid_version("12.345.6789"), 1, "multi-digit valid");
+    assert_equal_int(is_valid_version(""),           0, "empty version invalid");
+    assert_equal_int(is_valid_version(NULL),         0, "NULL version invalid");
+    assert_equal_int(is_valid_version("1.2.3-rc1"),  0, "dash invalid");
+    assert_equal_int(is_valid_version("1.2.3; rm -rf /"), 0, "shell injection rejected");
+    assert_equal_int(is_valid_version("abc"),        0, "alpha invalid");
+    assert_equal_int(is_valid_version("1.2/3"),      0, "non-dot punctuation invalid");
+
+    /* Small-out-size: forces the `i < out_size - 1` bound to terminate
+     * the copy loop rather than the closing '"'. Kills L57 size-bound
+     * mutations on parse_tag_from_json. */
+    {
+        char small[5];   /* fits 4 chars + '\0' */
+        int r = parse_tag_from_json("{\"tag_name\":\"v9.10.11\"}", small, sizeof(small));
+        assert_equal_int(r, 0, "parse tag with small out buffer succeeds");
+        assert_true(strcmp(small, "9.10") == 0, "parse tag truncates at sizeof(out)-1");
+    }
+
+    printf("Meow update helper tests done!\n");
+}
+#endif
 
 /**
  * Test --analyze config parsing
@@ -688,8 +862,12 @@ int run_tests(void) {
     test_password_seeded();
 #endif
     test_config_parsing();
+    test_config_extra();
     test_relevancy_score_explanation();
     test_update_version_compare();
+#ifdef MEOW_TEST_RNG
+    test_update_helpers();
+#endif
     test_analyze_config();
     test_analyze_input_string();
 

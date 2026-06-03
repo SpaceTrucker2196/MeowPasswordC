@@ -111,6 +111,11 @@ uint32_t meow_random_uniform(uint32_t bound);
  * Never enable in shipped builds.
  */
 void meow_test_seed(uint64_t seed);
+
+/* Helpers in update.c that are static in production but exposed for
+ * direct mutation-testing under -DMEOW_TEST_RNG. */
+int parse_tag_from_json(const char *json, char *out, size_t out_size);
+int is_valid_version(const char *version);
 #endif
 
 /* ============ Cat Names Functions (catnames.c) ============ */
