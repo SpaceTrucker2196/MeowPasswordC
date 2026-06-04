@@ -12,6 +12,12 @@ on:
 
 jobs:
   mirror:
+    # Only run on the source repo. The mirror at river-io/MeowPasswordC
+    # gets this file via the mirror push; without this guard a release
+    # publish on the mirror (triggered by the source-mirror tag push)
+    # would re-run this workflow on river-io and try to push river-io
+    # back to river-io — fails by design.
+    if: github.repository == 'SpaceTrucker2196/MeowPasswordC'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout full history

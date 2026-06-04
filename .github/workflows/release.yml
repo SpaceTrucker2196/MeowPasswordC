@@ -7,6 +7,11 @@ on:
 
 jobs:
   release:
+    # Only run on the source repo. The mirror at river-io/MeowPasswordC
+    # gets this file via the mirror push, but should not rebuild
+    # tarballs from the mirrored source — the source-built artifact
+    # is the canonical one.
+    if: github.repository == 'SpaceTrucker2196/MeowPasswordC'
     runs-on: ubuntu-latest
 
     steps:
